@@ -1,0 +1,24 @@
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# API keys and secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# ChromaDB runtime data
+database/chroma_db/
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
