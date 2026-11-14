@@ -38,14 +38,18 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 
+
 def get_config_value(name, default=""):
     """Read configuration from Streamlit Secrets or environment."""
-    try:
-        value = st.secrets.get(name, default)
-    except Exception:
-        value = default
 
-    return value or os.getenv(name, default)
+    try:
+        value = st.secrets.get(name)
+        if value:
+            return str(value)
+    except Exception:
+        pass
+
+    return os.getenv(name, default)
 
 
 api_key = get_config_value("GEMINI_API_KEY")
