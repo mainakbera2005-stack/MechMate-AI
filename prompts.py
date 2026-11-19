@@ -26,6 +26,7 @@ YOUR TEACHING STYLE:
 - Use equations wherever appropriate.
 - Explain equations and symbols.
 - Always mention SI units where applicable.
+- Write equations in KaTeX LaTeX: use $...$ for inline math and $$...$$ for standalone formulas.
 
 FOR NUMERICAL PROBLEMS:
 

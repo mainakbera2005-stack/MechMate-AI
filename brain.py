@@ -1,10 +1,10 @@
-
-
+import os
+from typing import Generator
 from google import genai
 from google.genai import types
 
-
-MODEL_NAME = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = "gemini-2.5-flash"
+MODEL_NAME = os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
 
 
 ENGINEERING_RULES = """
@@ -33,18 +33,21 @@ ANSWER STYLE:
 3. Highlight the final result clearly.
 4. Do not claim an answer is verified unless it has actually been checked.
 5. Prefer a correct, qualified answer over a confident but unsupported answer.
+
+MATHEMATICAL NOTATION & LATEX FORMATTING:
+1. Write all mathematical expressions, variables, and formulas in KaTeX-compatible LaTeX format.
+2. Use inline math `$ ... $` for variables, symbols, and expressions (e.g. $P_1$, $\\rho$, $\\mu$, $\\text{Re} = \\frac{\\rho v D}{\\mu}$).
+3. Use display math `$$ ... $$` on their own lines for standalone formulas and mathematical derivations.
+4. Never use bare parentheses or brackets like `\\(` or `\\[` for math.
 """
 
 
-def ask_gemini(
-    question,
-    context="",
-    history="",
-    system_prompt="",
-    api_key=""
+def _prepare_request_payload(
+    question: str,
+    context: str = "",
+    history: str = "",
+    system_prompt: str = ""
 ):
-    client = genai.Client(api_key=api_key)
-
     combined_system_prompt = f"""
     {system_prompt}
 
@@ -62,16 +65,62 @@ def ask_gemini(
     {question}
     """
 
+    return combined_system_prompt, prompt
+
+
+def ask_gemini(
+    question: str,
+    context: str = "",
+    history: str = "",
+    system_prompt: str = "",
+    api_key: str = "",
+    model: str = None
+) -> str:
+    """Generate a complete text answer from Gemini."""
+    client = genai.Client(api_key=api_key)
+    target_model = model or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+    combined_system_prompt, prompt = _prepare_request_payload(
+        question, context, history, system_prompt
+    )
+
     response = client.models.generate_content(
-        model=MODEL_NAME,
+        model=target_model,
         contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=combined_system_prompt,
             temperature=0.2,
-            max_output_tokens=1800
+            max_output_tokens=4096
         )
     )
 
     return response.text
 
 
+def ask_gemini_stream(
+    question: str,
+    context: str = "",
+    history: str = "",
+    system_prompt: str = "",
+    api_key: str = "",
+    model: str = None
+) -> Generator[str, None, None]:
+    """Stream text tokens from Gemini as they are generated."""
+    client = genai.Client(api_key=api_key)
+    target_model = model or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
+    combined_system_prompt, prompt = _prepare_request_payload(
+        question, context, history, system_prompt
+    )
+
+    response_stream = client.models.generate_content_stream(
+        model=target_model,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            system_instruction=combined_system_prompt,
+            temperature=0.2,
+            max_output_tokens=4096
+        )
+    )
+
+    for chunk in response_stream:
+        if chunk.text:
+            yield chunk.text

@@ -7,7 +7,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-from brain import ask_gemini
+from brain import ask_gemini, ask_gemini_stream
 from rag import (
     load_embedding_model,
     load_collection,
@@ -220,12 +220,11 @@ if question:
 
     with st.chat_message("assistant"):
 
-        with st.spinner(
-            "MechMate is studying your notes..."
-        ):
+        retrieved_documents = []
+        context = ""
 
+        with st.spinner("MechMate is studying your notes..."):
             try:
-
                 retrieved_documents = retrieve_context(
                     question,
                     collection,
@@ -233,61 +232,47 @@ if question:
                     selected_subject,
                     top_k=4
                 )
+                context = build_context(retrieved_documents)
+            except Exception as rag_err:
+                st.warning(f"Could not retrieve notes: {rag_err}")
+                context = ""
 
-                context = build_context(
-                    retrieved_documents
-                )
-
-                # Generate the final answer
-                # Generate the final answer
-
-                answer = ask_gemini(
+        try:
+            stream_generator = ask_gemini_stream(
                 question=question,
                 context=context,
                 history=history,
                 system_prompt=SYSTEM_PROMPT,
                 api_key=api_key
-)
+            )
 
-                
+            answer = st.write_stream(stream_generator)
 
-                st.markdown(answer)
+            # Show retrieved sources
+            if retrieved_documents:
+                with st.expander("📚 View retrieved sources"):
+                    for item in retrieved_documents:
+                        st.markdown(
+                            f"""
+                            **File:** {item['source']}  
+                            **Subject:** {item['subject']}  
+                            **Page:** {item['page']}  
 
-                # Show retrieved sources
-
-                if retrieved_documents:
-
-                    with st.expander("📚 View retrieved sources"):
-
-                        for item in retrieved_documents:
-
-                            st.markdown(
-                                f"""
-                                **File:** {item['source']}
-
-                                **Subject:** {item['subject']}
-
-                                **Page:** {item['page']}
-
-                                ---
-                                """
-                            )
-
-                else:
-
-                    st.info(
-                        "No study material has been retrieved. "
-                        "The answer may rely on general knowledge."
-                    )
-
-            except Exception as error:
-
-                answer = (
-                    "Something went wrong. "
-                    "Please check your API connection and try again."
+                            ---
+                            """
+                        )
+            else:
+                st.info(
+                    "No study material has been retrieved. "
+                    "The answer may rely on general knowledge."
                 )
 
-                st.error(f"{answer}\n\nDetails: {error}")
+        except Exception as error:
+            answer = (
+                "Something went wrong while generating the answer. "
+                "Please check your Gemini API key, model access, and internet connection."
+            )
+            st.error(f"{answer}\n\nDetails: {error}")
 
     st.session_state.messages.append({
         "role": "assistant",
