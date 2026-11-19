@@ -127,7 +127,7 @@ if st.sidebar.button(
             try:
 
                 with st.spinner(
-                    f"Processing {uploaded_file.name}..."
+                    f"Processing {uploaded_file.name} (OCR enabled if scanned)..."
                 ):
 
                     chunks, message = process_pdf(
@@ -135,7 +135,8 @@ if st.sidebar.button(
                         uploaded_file.name,
                         subject_to_store,
                         collection,
-                        embedding_model
+                        embedding_model,
+                        api_key=api_key
                     )
 
                 if chunks > 0:
