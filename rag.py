@@ -14,6 +14,9 @@ DB_PATH = BASE_DIR / "database" / "chroma_db"
 
 DB_PATH.mkdir(parents=True, exist_ok=True)
 
+# Sources strictly excluded from user chat context (e.g. internal test fixtures)
+EXCLUDED_SOURCES = {"fluid_mechanics_fixed.pdf"}
+
 
 # Load the embedding model
 def load_embedding_model():
@@ -24,13 +27,14 @@ def load_embedding_model():
 
 
 # Connect to ChromaDB
-def load_collection():
-    client = chromadb.PersistentClient(
-        path=str(DB_PATH)
-    )
+def load_collection(client=None, collection_name="mechmate_knowledge"):
+    if client is None:
+        client = chromadb.PersistentClient(
+            path=str(DB_PATH)
+        )
 
     collection = client.get_or_create_collection(
-        name="mechmate_knowledge",
+        name=collection_name,
         metadata={"hnsw:space": "cosine"}
     )
 
@@ -41,7 +45,7 @@ def load_collection():
 def split_text(text: str, chunk_size: int = 900, overlap: int = 150) -> List[str]:
     """
     Recursively splits text using structural separators (paragraphs, newlines,
-    sentences, spaces) to avoid breaking mathematical equations, tables, or words.
+    sentences, spaces) to preserve mathematical equations, tables, and notes.
     """
     if not text or not text.strip():
         return []
@@ -237,7 +241,8 @@ def retrieve_context(
     embedding_model,
     subject: str = "All subjects",
     top_k: int = 4,
-    max_distance: Optional[float] = None
+    max_distance: Optional[float] = None,
+    exclude_sources: Optional[set] = None
 ) -> List[Dict[str, Any]]:
     if collection.count() == 0:
         return []
@@ -260,7 +265,7 @@ def retrieve_context(
 
     results = collection.query(
         query_embeddings=[question_embedding],
-        n_results=min(top_k, collection.count()),
+        n_results=min(top_k * 2, collection.count()),
         where=query_filter,
         include=[
             "documents",
@@ -270,6 +275,7 @@ def retrieve_context(
     )
 
     retrieved = []
+    ignored = exclude_sources if exclude_sources is not None else EXCLUDED_SOURCES
 
     documents = results["documents"][0]
     metadatas = results["metadatas"][0]
@@ -278,6 +284,10 @@ def retrieve_context(
     for document, metadata, distance in zip(
         documents, metadatas, distances
     ):
+        # Exclude internal test fixtures (e.g. fluid_mechanics_fixed.pdf)
+        if metadata.get("source") in ignored:
+            continue
+
         if max_distance is not None and distance > max_distance:
             continue
 
@@ -288,6 +298,9 @@ def retrieve_context(
             "page": metadata["page"],
             "distance": distance
         })
+
+        if len(retrieved) >= top_k:
+            break
 
     return retrieved
 
@@ -313,3 +326,49 @@ def build_context(retrieved_documents: List[Dict[str, Any]]) -> str:
         """
 
     return context
+
+
+# ----------------------------------------------------
+# KNOWLEDGE BASE MANAGEMENT
+# ----------------------------------------------------
+
+def get_indexed_documents(collection) -> List[Dict[str, Any]]:
+    """Returns a summary list of all distinct files indexed in ChromaDB."""
+    if collection.count() == 0:
+        return []
+
+    data = collection.get(include=["metadatas"])
+    doc_map: Dict[str, Dict[str, Any]] = {}
+
+    for meta in data.get("metadatas", []):
+        src = meta.get("source", "Unknown")
+        sub = meta.get("subject", "General")
+        hsh = meta.get("file_hash", "")
+        if src not in doc_map:
+            doc_map[src] = {
+                "source": src,
+                "subject": sub,
+                "file_hash": hsh,
+                "chunks": 0
+            }
+        doc_map[src]["chunks"] += 1
+
+    return list(doc_map.values())
+
+
+def delete_document(collection, filename: str) -> int:
+    """Deletes all chunks belonging to a specific document from ChromaDB."""
+    existing = collection.get(where={"source": filename})
+    ids_to_delete = existing.get("ids", [])
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+    return len(ids_to_delete)
+
+
+def clear_database(collection) -> int:
+    """Deletes all documents from ChromaDB, returning the number of chunks removed."""
+    existing = collection.get()
+    ids_to_delete = existing.get("ids", [])
+    if ids_to_delete:
+        collection.delete(ids=ids_to_delete)
+    return len(ids_to_delete)

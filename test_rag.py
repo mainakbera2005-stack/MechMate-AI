@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import chromadb
 
 from rag import (
     load_embedding_model,
@@ -32,10 +33,14 @@ print(f"Generated {len(chunks)} smart chunk(s).")
 for idx, ch in enumerate(chunks, 1):
     print(f"Chunk {idx}:\n{ch}\n---")
 
-print("\n--- 2. Loading RAG Components ---")
+print("\n--- 2. Loading RAG Components in Ephemeral Test Client ---")
+print("(Using in-memory test database so user database is NEVER polluted)")
 model = load_embedding_model()
-collection = load_collection()
-print("RAG engine loaded successfully!")
+
+# Use an ephemeral client for isolated testing
+test_client = chromadb.EphemeralClient()
+test_collection = load_collection(client=test_client, collection_name="test_knowledge")
+print("Ephemeral test RAG engine initialized successfully!")
 
 pdf_path = Path("data/fluid_mechanics_fixed.pdf")
 if pdf_path.exists():
@@ -44,24 +49,25 @@ if pdf_path.exists():
 
     chunks_count, message = process_pdf(
         pdf_bytes,
-        "fluid_mechanics_fixed.pdf",
+        "sample_test_doc.pdf",
         "Fluid Mechanics",
-        collection,
+        test_collection,
         model,
         api_key=api_key
     )
-    print(f"Index status: {message} ({chunks_count} chunks)")
+    print(f"Test Index status: {message} ({chunks_count} chunks)")
 
     print("\n--- 3. Testing Context Retrieval ---")
     question = "Explain Bernoulli's theorem"
     results = retrieve_context(
         question,
-        collection,
+        test_collection,
         model,
-        subject="Fluid Mechanics"
+        subject="Fluid Mechanics",
+        exclude_sources=set()  # allow in isolated test
     )
 
-    print(f"Retrieved {len(results)} context chunks:")
+    print(f"Retrieved {len(results)} context chunks in isolated test:")
     for item in results:
         print(f"Source: {item['source']} (Page {item['page']})")
         print(f"Subject: {item['subject']} | Distance: {item.get('distance', 0):.4f}")
