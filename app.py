@@ -4,6 +4,7 @@ from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv
 
+from brain import ask_gemini, ask_gemini_stream
 from brain import ask_gemini_stream
 from rag import (
     load_embedding_model,
@@ -392,6 +393,14 @@ if question:
         retrieved_documents = []
         context = ""
 
+    # Search relevant study materials
+
+    with st.chat_message("assistant"):
+
+        retrieved_documents = []
+        context = ""
+
+        with st.spinner("MechMate is studying your notes..."):
         # Fast vector search
         with st.spinner("🔍 MechMate is consulting your study notes..."):
             try:
