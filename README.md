@@ -34,34 +34,57 @@ The application combines a language model with a Retrieval-Augmented Generation 
 
 ### Requirements
 
-- Windows
-- Python
-- Internet connection
+- Python 3.10+ (macOS, Linux, or Windows)
 - Google Gemini API key
+- Internet connection
 
-### Activate the virtual environment
+### 1. Clone the repository
 
-Open PowerShell in the project folder and run:
+```bash
+git clone https://github.com/sayaklearner-prog/MechMate-AI.git
+cd MechMate-AI
+```
 
+### 2. Set up virtual environment
+
+**macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**Windows (PowerShell):**
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Alternatively, use the virtual environment's Python executable directly.
+### 3. Install dependencies
 
-### Run the application
-
-```powershell
-& ".\.venv\Scripts\python.exe" -m streamlit run app.py
+```bash
+pip install -r requirements.txt
 ```
 
-Open the local URL displayed in the terminal, usually:
+### 4. Configure environment variables
 
+Copy `.env.example` to `.env` and add your Gemini API key:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
 ```text
-http://localhost:8501
+GEMINI_API_KEY=your_actual_api_key_here
 ```
 
-The port may change if another Streamlit instance is already running.
+### 5. Run the application
+
+```bash
+streamlit run app.py
+```
+
+Open the local URL displayed in the terminal (usually `http://localhost:8501`).
 
 ## 5. Important Project Files
 
