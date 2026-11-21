@@ -1,27 +1,33 @@
+import os
+import sys
+from pathlib import Path
+from dotenv import load_dotenv
+from pypdf import PdfReader
+from rag import render_page_to_pdf_bytes, transcribe_page_with_gemini
 
-import fitz
-import pytesseract
+load_dotenv()
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe\tesseract.exe"
+api_key = os.getenv("GEMINI_API_KEY")
+pdf_path = Path("data/fluid_mechanics_fixed.pdf")
 
-from PIL import Image
-from io import BytesIO
+if not api_key:
+    print("Warning: GEMINI_API_KEY is not set. Please set it in .env to test Gemini Vision OCR.")
+    sys.exit(1)
 
+if not pdf_path.exists():
+    print(f"Error: {pdf_path} does not exist.")
+    sys.exit(1)
 
-pdf_path = "data/fluid_mechanics_fixed.pdf"
+print(f"Testing Gemini Vision OCR on: {pdf_path}")
+reader = PdfReader(str(pdf_path))
+print(f"Total pages: {len(reader.pages)}")
 
-doc = fitz.open(pdf_path)
+# Test on page 1
+page_1 = reader.pages[0]
+page_bytes = render_page_to_pdf_bytes(page_1)
+print("Sending page 1 to Gemini Multimodal Document Understanding...")
 
-for page_number, page in enumerate(doc):
-    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-
-    image = Image.open(
-        BytesIO(pix.tobytes("png"))
-    )
-
-    text = pytesseract.image_to_string(image)
-
-    print(f"\n--- PAGE {page_number + 1} ---")
-    print(text[:1000])
-
-doc.close()
+transcription = transcribe_page_with_gemini(page_bytes, api_key=api_key)
+print("\n--- EXTRACTED OCR & FORMULA CONTENT ---")
+print(transcription[:1500])
+print("\nGemini Vision OCR test completed successfully!")
